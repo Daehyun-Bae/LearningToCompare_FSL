@@ -15,6 +15,7 @@ import numpy as np
 import task_generator_test as tg
 import os
 import math
+import datetime
 import argparse
 import scipy as sp
 import scipy.stats
@@ -109,7 +110,8 @@ class RelationNetwork(nn.Module):
         out = self.layer2(out)
         out = out.view(out.size(0), -1)
         out = F.relu(self.fc1(out))
-        out = F.sigmoid(self.fc2(out))
+        # out = F.sigmoid(self.fc2(out))    # Deprecated
+        out = torch.sigmoid(self.fc2(out))
         return out
 
 
@@ -130,6 +132,13 @@ def weights_init(m):
 
 
 def main():
+    # Step 0: Experiment info
+    date = datetime.datetime.today()
+    today = date.date()
+    now = date.time()
+    exp_date = '{}{:02d}{:02d}-{:02d}{:02d}'.format(today.year % 100, today.month, today.day,
+                                                   now.hour, now.minute)
+    print('\n{} {} {}-way {}-shot Mini ImageNet training\n'.format(today, now, CLASS_NUM, SAMPLE_NUM_PER_CLASS))
     # Step 1: init data folders
     print("init data folders")
     # init character folders for dataset construction
@@ -143,6 +152,7 @@ def main():
 
     feature_encoder.apply(weights_init)
     relation_network.apply(weights_init)
+    print("Construct model success")
 
     feature_encoder.cuda(GPU)
     relation_network.cuda(GPU)
@@ -152,18 +162,18 @@ def main():
     relation_network_optim = torch.optim.Adam(relation_network.parameters(), lr=LEARNING_RATE)
     relation_network_scheduler = StepLR(relation_network_optim, step_size=100000, gamma=0.5)
 
-    if os.path.exists(str("./models/miniimagenet_feature_encoder_" + str(CLASS_NUM) + "way_" + str(
-            SAMPLE_NUM_PER_CLASS) + "shot.pkl")):
-        feature_encoder.load_state_dict(torch.load(str(
-            "./models/miniimagenet_feature_encoder_" + str(CLASS_NUM) + "way_" + str(
-                SAMPLE_NUM_PER_CLASS) + "shot.pkl")))
-        print("load feature encoder success")
-    if os.path.exists(str("./models/miniimagenet_relation_network_" + str(CLASS_NUM) + "way_" + str(
-            SAMPLE_NUM_PER_CLASS) + "shot.pkl")):
-        relation_network.load_state_dict(torch.load(str(
-            "./models/miniimagenet_relation_network_" + str(CLASS_NUM) + "way_" + str(
-                SAMPLE_NUM_PER_CLASS) + "shot.pkl")))
-        print("load relation network success")
+    # if os.path.exists(str("./models/miniimagenet_feature_encoder_" + str(CLASS_NUM) + "way_" + str(
+    #         SAMPLE_NUM_PER_CLASS) + "shot.pkl")):
+    #     feature_encoder.load_state_dict(torch.load(str(
+    #         "./models/miniimagenet_feature_encoder_" + str(CLASS_NUM) + "way_" + str(
+    #             SAMPLE_NUM_PER_CLASS) + "shot.pkl")))
+    #     print("load feature encoder success")
+    # if os.path.exists(str("./models/miniimagenet_relation_network_" + str(CLASS_NUM) + "way_" + str(
+    #         SAMPLE_NUM_PER_CLASS) + "shot.pkl")):
+    #     relation_network.load_state_dict(torch.load(str(
+    #         "./models/miniimagenet_relation_network_" + str(CLASS_NUM) + "way_" + str(
+    #             SAMPLE_NUM_PER_CLASS) + "shot.pkl")))
+    #     print("load relation network success")
 
     # Step 3: build graph
     print("Training...")
@@ -215,14 +225,14 @@ def main():
 
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm(feature_encoder.parameters(), 0.5)
-        torch.nn.utils.clip_grad_norm(relation_network.parameters(), 0.5)
+        torch.nn.utils.clip_grad_norm_(feature_encoder.parameters(), 0.5)
+        torch.nn.utils.clip_grad_norm_(relation_network.parameters(), 0.5)
 
         feature_encoder_optim.step()
         relation_network_optim.step()
 
         if (episode + 1) % 100 == 0:
-            print("episode:", episode + 1, "loss", loss.data[0])
+            print("episode: {}\tloss:{:.6f}".format(episode + 1, loss.item()))
 
         if episode % 5000 == 0:
 
@@ -260,6 +270,7 @@ def main():
 
                     _, predict_labels = torch.max(relations.data, 1)
 
+                    test_labels = test_labels.cuda(GPU)
                     rewards = [1 if predict_labels[j] == test_labels[j] else 0 for j in range(batch_size)]
 
                     total_rewards += np.sum(rewards)
@@ -269,16 +280,18 @@ def main():
 
             test_accuracy, h = mean_confidence_interval(accuracies)
 
-            print("test accuracy:", test_accuracy, "h:", h)
+            print("test accuracy:{:.3f}\th:{:.5f}".format(test_accuracy, h))
 
             if test_accuracy > last_accuracy:
                 # save networks
-                torch.save(feature_encoder.state_dict(), str(
-                    "./models/miniimagenet_feature_encoder_" + str(CLASS_NUM) + "way_" + str(
-                        SAMPLE_NUM_PER_CLASS) + "shot.pkl"))
-                torch.save(relation_network.state_dict(), str(
-                    "./models/miniimagenet_relation_network_" + str(CLASS_NUM) + "way_" + str(
-                        SAMPLE_NUM_PER_CLASS) + "shot.pkl"))
+                torch.save(feature_encoder.state_dict(),
+                           "./models/{}_miniimagenet_feature_encoder_{}way_{}shot.pkl".format(
+                               exp_date, CLASS_NUM, SAMPLE_NUM_PER_CLASS
+                           ))
+                torch.save(relation_network.state_dict(),
+                           "./models/{}_miniimagenet_relation_network_{}way_{}shot.pkl".format(
+                               exp_date, CLASS_NUM, SAMPLE_NUM_PER_CLASS
+                           ))
 
                 print("save networks for episode:", episode)
 
