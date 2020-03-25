@@ -100,5 +100,9 @@ ENV/
 # mypy
 .mypy_cache/
 .DS_Store
+
+
 *.xml
 *.iml
+.idea/
+*.jpg

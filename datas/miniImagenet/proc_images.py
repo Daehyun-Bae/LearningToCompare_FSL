@@ -14,9 +14,10 @@ import csv
 import glob
 import os
 
+from shutil import copy
 from PIL import Image
 
-path_to_images = 'images/'
+path_to_images = 'mini_imagenet_convert/'
 
 all_images = glob.glob(path_to_images + '*')
 
@@ -31,9 +32,9 @@ for i, image_file in enumerate(all_images):
 
 # Put in correct directory
 for datatype in ['train', 'val', 'test']:
-    os.system('mkdir ' + datatype)
-
-    with open(datatype + '.csv', 'r') as f:
+    # os.system('mkdir ' + datatype)
+    os.makedirs(datatype, exist_ok=True)
+    with open(datatype + '_cvt.csv', 'r') as f:
         reader = csv.reader(f, delimiter=',')
         last_label = ''
         for i, row in enumerate(reader):
@@ -43,6 +44,8 @@ for datatype in ['train', 'val', 'test']:
             image_name = row[0]
             if label != last_label:
                 cur_dir = datatype + '/' + label + '/'
-                os.system('mkdir ' + cur_dir)
+                # os.system('mkdir ' + cur_dir)
+                os.makedirs(cur_dir, exist_ok=True)
                 last_label = label
-            os.system('cp images/' + image_name + ' ' + cur_dir)
+            # os.system('cp images/' + image_name + ' ' + cur_dir)
+            copy(os.path.join(path_to_images, image_name), os.path.join(cur_dir, image_name))
