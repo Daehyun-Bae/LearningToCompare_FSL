@@ -4,6 +4,9 @@
 # Author: Flood Sung
 # All Rights Reserved
 # -------------------------------------
+# Date: 2020. 3. 30 ~
+# Project: Train Relation Net on Mini-Market dataset
+# -------------------------------------
 
 
 import torch
@@ -12,7 +15,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.optim.lr_scheduler import StepLR
 import numpy as np
-import task_generator_test as tg
+import task_generator_test_minimarket as tg
 import os
 import math
 import datetime
